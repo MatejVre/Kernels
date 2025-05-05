@@ -4,6 +4,10 @@ from sklearn.metrics.pairwise import rbf_kernel
 import pandas as pd
 import matplotlib.pyplot as plt
 from cvxopt import matrix, solvers
+from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import cross_val_score
 
 class Polynomial():
 
@@ -73,7 +77,7 @@ class SVR():
         #alphas should be [alpha_i, alpha_i*, ...] should be 2n of them right?
         A = np.zeros((1, 2*n))
         for i in range(n):
-            A[0, 2*i]   = 1   # α_i
+            A[0, 2*i] = 1   # α_i
             A[0, 2*i+1] = -1  # -α_i*
         A = matrix(A)
         b = matrix([0.0])
@@ -118,7 +122,19 @@ class SVR():
         K = self.kernel(X, self.X_train)
         return np.dot(K, cs) + self.b
 
+class KRR_scikit(BaseEstimator, ClassifierMixin):
+
+    def __init__(self, kernel, lambda_=0.0):
+        self.kernel = kernel
+        self.lambda_ = lambda_
+
+    def fit(self, X, y):
+        self.model = KernelizedRidgeRegression(self.kernel, self.lambda_)
+        self.model.fit(X, y)
+        return self
     
+    def predict(self, X):
+        return self.model.predict(X)
 
 def sine_data():
     sine_df = pd.read_csv("sine.csv")
@@ -128,7 +144,13 @@ def sine_data():
     X = X.reshape(-1, 1)
     y = y.reshape(-1)
     return X, y
-    
+
+def housing_data():
+    housing_df = pd.read_csv("housing2r.csv")
+    y = housing_df["y"].to_numpy()
+    X = housing_df.drop(columns="y").to_numpy()
+    return X, y
+
 def plot_KRR_RBF(X, y, sigma=1, lambda_=0.1, save=False, ax=None):
     predictor = KernelizedRidgeRegression(RBF(sigma=sigma), lambda_=lambda_)
     predictor = predictor.fit(X, y)
@@ -198,17 +220,33 @@ if __name__ == "__main__":
 
     # print(rbf_kernel(a, b, gamma=12.5))
     
-    X, y = sine_data()
+    # X, y = sine_data()
 
-    fig, axes = plt.subplots(2, 2)
-    plot_KRR_POLY(X, y, M=5, lambda_=1, ax=axes[0][0])
-    plot_KRR_RBF(X, y, ax=axes[0][1])
-    plot_SVR_POLY(X, y, M=5, lambda_=1, ax=axes[1][0])
-    plot_SVR_RBF(X, y, ax=axes[1][1])
-    axes[0][0].set_title("KRR-Polynomial Kernel")
-    axes[0][1].set_title("KRR-RBF Kernel")
-    axes[1][0].set_title("SVR-Polynomial Kernel")
-    axes[1][1].set_title("SVR-RBF Kernel")
-    #TODO add legend and maybe pack this into function
+    # fig, axes = plt.subplots(2, 2)
+    # plot_KRR_POLY(X, y, M=5, lambda_=1, ax=axes[0][0])
+    # plot_KRR_RBF(X, y, ax=axes[0][1])
+    # plot_SVR_POLY(X, y, M=5, lambda_=1, ax=axes[1][0])
+    # plot_SVR_RBF(X, y, ax=axes[1][1])
+    # axes[0][0].set_title("KRR-Polynomial Kernel")
+    # axes[0][1].set_title("KRR-RBF Kernel")
+    # axes[1][0].set_title("SVR-Polynomial Kernel")
+    # axes[1][1].set_title("SVR-RBF Kernel")
+    # #TODO add legend and maybe pack this into function
+    # plt.show()
+
+    X, y = housing_data()
+    s = []
+    for i in range(1, 11):
+
+        m = Pipeline([
+            ("scaler", StandardScaler()),
+            ("Kernel Ridge Regression", KRR_scikit(kernel=Polynomial(M=i), lambda_=1))
+        ])
+
+        scores = cross_val_score(m, X, y, cv=10, scoring="neg_mean_squared_error")
+        s.append(np.mean(np.abs(scores)))
+
+    plt.plot(range(len(s)), s)
+    plt.yscale("log")
     plt.show()
-
+    
