@@ -53,6 +53,8 @@ class SVR():
         self.alphas_star = None
         self.b = None
         self.X_train = None
+        self.X_support = None
+        self.y_support = None
 
     def fit(self, X, y):
 
@@ -63,10 +65,10 @@ class SVR():
         P = np.zeros((2 * n, 2 * n))
         for i in range(n):
             for j in range(n):
-                P[2*i, 2*j]     = K[i, j]     # α_i α_j
-                P[2*i+1, 2*j+1] = K[i, j]     # α_i* α_j*
-                P[2*i, 2*j+1]   = -K[i, j]    # α_i α_j*
-                P[2*i+1, 2*j]   = -K[i, j]    # α_i* α_j
+                P[2*i, 2*j] = K[i, j]
+                P[2*i+1, 2*j+1] = K[i, j]
+                P[2*i, 2*j+1] = -K[i, j]
+                P[2*i+1, 2*j] = -K[i, j]
 
         #alphas should be [alpha_i, alpha_i*, ...] should be 2n of them right?
         A = np.zeros((1, 2*n))
@@ -97,6 +99,17 @@ class SVR():
         self.alphas_star = all_alphas[1::2]
         self.b = sol["y"]
 
+        tol = 1e-5
+        support_mask = (
+            (self.alphas > tol) & (self.alphas < self.C - tol)
+        ) | (
+            (self.alphas_star > tol) & (self.alphas_star < self.C - tol)
+        )
+        support_indices = np.where(support_mask)[0]
+
+        self.X_support = X[support_indices]
+        self.y_support = y[support_indices]
+
         return self
     
     def predict(self, X):
@@ -116,61 +129,63 @@ def sine_data():
     y = y.reshape(-1)
     return X, y
     
-def plot_KRR_RBF(X, y, sigma=1, lambda_=0.1, save=False):
+def plot_KRR_RBF(X, y, sigma=1, lambda_=0.1, save=False, ax=None):
     predictor = KernelizedRidgeRegression(RBF(sigma=sigma), lambda_=lambda_)
     predictor = predictor.fit(X, y)
 
     span = np.linspace(np.min(X), np.max(X), 200).reshape(-1, 1)
     predictions = predictor.predict(span)
 
-    plt.scatter(X, y)
-    plt.plot(span, predictions, color="r")
+    ax.scatter(X, y)
+    ax.plot(span, predictions, color="r")
 
     if save:
         plt.savefig("kernelized_ridge_regression_RBF_sine.pdf", bbox_inches="tight")
-    plt.show()
+    return ax
 
-def plot_KRR_POLY(X, y, M=1, lambda_=0.1, save=False):
+def plot_KRR_POLY(X, y, M=1, lambda_=0.1, save=False, ax=None):
     predictor = KernelizedRidgeRegression(Polynomial(M=M), lambda_=lambda_)
     predictor = predictor.fit(X, y)
 
     span = np.linspace(np.min(X), np.max(X), 200).reshape(-1, 1)
     predictions = predictor.predict(span)
 
-    plt.scatter(X, y)
-    plt.plot(span, predictions, color="r")
+    ax.scatter(X, y)
+    ax.plot(span, predictions, color="r")
 
     if save:
         plt.savefig("kernelized_ridge_regression_POLY_sine.pdf", bbox_inches="tight")
-    plt.show()
+    return ax
 
-def plot_SVR_RBF(X, y, sigma=1, lambda_=0.1, save=False):
+def plot_SVR_RBF(X, y, sigma=1, lambda_=0.1, save=False, ax=None):
     predictor = SVR(RBF(sigma=sigma), lambda_=lambda_)
     predictor = predictor.fit(X, y)
 
     span = np.linspace(np.min(X), np.max(X), 200).reshape(-1, 1)
     predictions = predictor.predict(span)
 
-    plt.scatter(X, y)
-    plt.plot(span, predictions, color="r")
+    ax.scatter(X, y)
+    ax.plot(span, predictions, color="r")
+    ax.scatter(predictor.X_support, predictor.y_support, edgecolor="black")
 
     if save:
         plt.savefig("support_vector_regression_RBF_sine.pdf", bbox_inches="tight")
-    plt.show()
+    
+    return ax
 
-def plot_SVR_POLY(X, y, M=1, lambda_=0.1, save=False):
-    predictor = SVR(Polynomial(M=M), lambda_=lambda_)
+def plot_SVR_POLY(X, y, M=1, lambda_=0.1, save=False, ax=None):
+    predictor = SVR(Polynomial(M=M), lambda_=lambda_, epsilon=0.1)
     predictor = predictor.fit(X, y)
 
     span = np.linspace(np.min(X), np.max(X), 200).reshape(-1, 1)
     predictions = predictor.predict(span)
 
-    plt.scatter(X, y)
-    plt.plot(span, predictions, color="r")
-
+    ax.scatter(X, y)
+    ax.plot(span, predictions, color="r")
+    ax.scatter(predictor.X_support, predictor.y_support, edgecolor="black")
+    
     if save:
         plt.savefig("support_vector_regression_POLY_sine.pdf", bbox_inches="tight")
-    plt.show()
 
 if __name__ == "__main__":
     # pol = RBF(sigma=0.2)
@@ -185,16 +200,15 @@ if __name__ == "__main__":
     
     X, y = sine_data()
 
-    plot_SVR_POLY(X, y, M=5, lambda_=1)
+    fig, axes = plt.subplots(2, 2)
+    plot_KRR_POLY(X, y, M=5, lambda_=1, ax=axes[0][0])
+    plot_KRR_RBF(X, y, ax=axes[0][1])
+    plot_SVR_POLY(X, y, M=5, lambda_=1, ax=axes[1][0])
+    plot_SVR_RBF(X, y, ax=axes[1][1])
+    axes[0][0].set_title("KRR-Polynomial Kernel")
+    axes[0][1].set_title("KRR-RBF Kernel")
+    axes[1][0].set_title("SVR-Polynomial Kernel")
+    axes[1][1].set_title("SVR-RBF Kernel")
+    #TODO add legend and maybe pack this into function
+    plt.show()
 
-    # svr = SVR(RBF(sigma=0.1))
-    # svr = svr.fit(X, y)
-
-    # span = np.linspace(np.min(X), np.max(X), 200).reshape(-1, 1)
-    # predictions = svr.predict(span)
-
-    # print(predictions.shape)
-
-    # plt.scatter(X, y)
-    # plt.plot(span, predictions, color="r")
-    # plt.show() 
