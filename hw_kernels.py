@@ -7,7 +7,7 @@ from cvxopt import matrix, solvers
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, GridSearchCV, KFold
 
 class Polynomial():
 
@@ -23,10 +23,13 @@ class RBF():
         self.sigma = sigma
 
     def __call__(self, A, B):
+        A = np.atleast_2d(A)
+        B = np.atleast_2d(B)
         a = np.sum(A*A, axis=-1).reshape(-1, 1)
         b = np.sum(B*B, axis=-1).reshape(1, -1)
         dist = a - 2*np.dot(A, B.T) + b
-        return(np.exp(-(dist / (2*(self.sigma**2)))))
+        K = (np.exp(-(dist / (2*(self.sigma**2)))))
+        return K.squeeze() if A.shape[0] == 1 or B.shape[0] == 1 else K
 
 class KernelizedRidgeRegression():
 
@@ -96,12 +99,12 @@ class SVR():
             q[2*i]   = self.epsilon - y[i]
             q[2*i+1] = self.epsilon + y[i]
 
-        sol = solvers.qp(matrix(P), matrix(q), matrix(G), matrix(h), matrix(A), matrix(b))
+        sol = solvers.qp(matrix(P), matrix(q), matrix(G), matrix(h), matrix(A), matrix(b), options={'show_progress': False})
 
         all_alphas = np.array(sol["x"]).flatten()
         self.alphas = all_alphas[::2]
         self.alphas_star = all_alphas[1::2]
-        self.b = sol["y"]
+        self.b = float(sol["y"][0])
 
         tol = 1e-5
         support_mask = (
@@ -120,7 +123,14 @@ class SVR():
         cs = self.alphas - self.alphas_star
         cs = cs.reshape(-1, 1)
         K = self.kernel(X, self.X_train)
-        return np.dot(K, cs) + self.b
+        res = np.dot(K, cs) + self.b
+        return res.flatten()
+    
+    def get_alpha(self):
+        return np.stack([self.alphas, self.alphas_star], axis=1)
+
+    def get_b(self):
+        return self.b
 
 class KRR_scikit(BaseEstimator, ClassifierMixin):
 
@@ -209,6 +219,92 @@ def plot_SVR_POLY(X, y, M=1, lambda_=0.1, save=False, ax=None):
     if save:
         plt.savefig("support_vector_regression_POLY_sine.pdf", bbox_inches="tight")
 
+def CV_polynomial(model_class, ax, lambda_, support_vectors=False):
+        s = []
+        average_svs = []
+        for i in range(1, 11):
+            kf = KFold(n_splits=5, shuffle=True, random_state=42) #!return num of splits to 10
+            cv_scores = []
+            sv = []
+
+            for train_indices, test_indices in kf.split(X):
+
+                X_train, X_test = X[train_indices], X[test_indices]
+                y_train, y_test = y[train_indices], y[test_indices]
+
+                scaler = StandardScaler()
+                scaler.fit(X_train)
+
+                X_train = scaler.transform(X_train)
+                X_test = scaler.transform(X_test)
+
+                model = model_class(kernel=Polynomial(M=i), lambda_=lambda_)
+                model = model.fit(X_train, y_train)
+
+                predictions = model.predict(X_test)
+
+                if support_vectors:
+                    sv.append(len(model.X_support))
+
+                cv_scores.append(np.mean((predictions - y_test)**2))
+
+            s.append(np.mean(cv_scores))
+            
+
+            if support_vectors:
+                average_svs.append(np.mean(sv))
+                ax.text(i-1, s[-1], f"{average_svs[-1]:.0f}", fontsize=9, ha='center', va='bottom')
+
+        ax.plot(range(1, len(s)+1), s, label="λ = 1")
+        ax.grid(True)
+        ax.set_xlabel("Degree")
+        ax.set_ylabel("MSE")
+        ax.legend()
+        ax.set_yscale("log")
+
+def CV_RBF(model_class, ax, lambda_, support_vectors=False):
+    s = []
+    average_svs = []
+    sigmas = [0.001, 0.01, 0.1, 1, 2, 3, 4, 6, 10, 100]
+
+    for i, sigma in enumerate(sigmas):
+        kf = KFold(n_splits=5, shuffle=True, random_state=42) #!return num of splits to 10
+        cv_scores = []
+        sv = []
+        
+        for train_indices, test_indices in kf.split(X):
+
+            X_train, X_test = X[train_indices], X[test_indices]
+            y_train, y_test = y[train_indices], y[test_indices]
+
+            scaler = StandardScaler()
+            scaler.fit(X_train)
+
+            X_train = scaler.transform(X_train)
+            X_test = scaler.transform(X_test)
+
+            model = model_class(kernel=RBF(sigma=sigma), lambda_=lambda_)
+            model = model.fit(X_train, y_train)
+
+            predictions = model.predict(X_test)
+
+            if support_vectors:
+                sv.append(len(model.X_support))
+
+            cv_scores.append(np.mean((predictions - y_test)**2))
+
+        s.append(np.mean(cv_scores))
+
+        if support_vectors:
+            average_svs.append(np.mean(sv))
+            ax.text(i, s[-1], f"{average_svs[-1]:.0f}", fontsize=9, ha='center', va='bottom')
+
+    ax.plot(range(len(s)), s, label="λ = 1")
+    ax.grid(True)
+    ax.set_xlabel("σ")
+    ax.set_ylabel("MSE")
+    ax.legend()
+
 if __name__ == "__main__":
     # pol = RBF(sigma=0.2)
     # a = np.array([[1,2,3],
@@ -216,7 +312,7 @@ if __name__ == "__main__":
     # b = np.array([[1,1,1],
     #               [1,1,1]])
     
-    # print(pol(a, b))
+    # print(pol(a[0], b))
 
     # print(rbf_kernel(a, b, gamma=12.5))
     
@@ -235,18 +331,51 @@ if __name__ == "__main__":
     # plt.show()
 
     X, y = housing_data()
-    s = []
-    for i in range(1, 11):
+    fig, axes = plt.subplots(2, 2)
 
-        m = Pipeline([
-            ("scaler", StandardScaler()),
-            ("Kernel Ridge Regression", KRR_scikit(kernel=Polynomial(M=i), lambda_=1))
-        ])
-
-        scores = cross_val_score(m, X, y, cv=10, scoring="neg_mean_squared_error")
-        s.append(np.mean(np.abs(scores)))
-
-    plt.plot(range(len(s)), s)
-    plt.yscale("log")
+    CV_polynomial(KernelizedRidgeRegression, axes[0][0], lambda_=1)
+    CV_polynomial(SVR, axes[0][1], lambda_=1, support_vectors=True)
+    CV_RBF(KernelizedRidgeRegression, axes[1][0], lambda_=1)
+    CV_RBF(SVR, axes[1][1], lambda_=1, support_vectors=True)
     plt.show()
+
+    ##############################################################################
+    #KFOLD USING WRAPPER
+    ##############################################################################
+        # s = []
+    # for i in range(1, 11):
+
+    #     m = Pipeline([
+    #         ("scaler", StandardScaler()),
+    #         ("Kernel Ridge Regression", KRR_scikit(kernel=Polynomial(M=i), lambda_=1))
+    #     ])
+
+    #     scores = cross_val_score(m, X, y, cv=KFold(n_splits=10, shuffle=True, random_state=42), scoring="neg_mean_squared_error")
+    #     s.append(np.mean(np.abs(scores)))
+
+    # axes[0].plot(range(len(s)), s)
+    # axes[0].set_yscale("log")
+    # plt.show()
+
+    ###############################################################################
+    #KFOLD WITHOUT WRAPPER
+    ###############################################################################
+
+
+    # m = Pipeline([
+    #         ("scaler", StandardScaler()),
+    #         ("Kernel Ridge Regression", KRR_scikit(kernel=Polynomial(M=1), lambda_=1))
+    #     ])
+
+    # param_grid = {"Kernel Ridge Regression__lambda_": [0.1, 0.5]}
+
+    # inner_cv = GridSearchCV(m, param_grid, scoring="neg_mean_squared_error", cv=5)
     
+    # outer_scores = cross_val_score(inner_cv, X, y, scoring="neg_mean_squared_error", cv=10)
+
+    # print("Mean outer CV score:", -outer_scores.mean())
+
+
+
+
+
