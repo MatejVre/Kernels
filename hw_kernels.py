@@ -7,7 +7,7 @@ from cvxopt import matrix, solvers
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import cross_val_score, GridSearchCV, KFold
+from sklearn.model_selection import cross_val_score, GridSearchCV, KFold, cross_val_predict
 
 class Polynomial():
 
@@ -134,13 +134,28 @@ class SVR():
 
 class KRR_scikit(BaseEstimator, ClassifierMixin):
 
-    def __init__(self, kernel, lambda_=0.0):
+    def __init__(self, kernel, lambda_=0.1):
         self.kernel = kernel
         self.lambda_ = lambda_
 
     def fit(self, X, y):
         self.model = KernelizedRidgeRegression(self.kernel, self.lambda_)
         self.model.fit(X, y)
+        return self
+    
+    def predict(self, X):
+        return self.model.predict(X)
+
+class SVR_scikit(BaseEstimator, ClassifierMixin):
+
+    def __init__(self, kernel, lambda_=0.1):
+        self.kernel = kernel
+        self.lambda_ = lambda_
+
+    def fit(self, X, y):
+        self.model = SVR(self.kernel, self.lambda_)
+        self.model.fit(X, y)
+        support_vector_numbers.append(len(self.model.X_support))
         return self
     
     def predict(self, X):
@@ -219,91 +234,144 @@ def plot_SVR_POLY(X, y, M=1, lambda_=0.1, save=False, ax=None):
     if save:
         plt.savefig("support_vector_regression_POLY_sine.pdf", bbox_inches="tight")
 
-def CV_polynomial(model_class, ax, lambda_, support_vectors=False):
-        s = []
-        average_svs = []
-        for i in range(1, 11):
-            kf = KFold(n_splits=5, shuffle=True, random_state=42) #!return num of splits to 10
-            cv_scores = []
-            sv = []
+# # def CV_polynomial(model_class, ax, lambda_, support_vectors=False):
+#         s = []
+#         average_svs = []
+#         for i in range(1, 11):
+#             kf = KFold(n_splits=5, shuffle=True, random_state=42) #!return num of splits to 10
+#             cv_scores = []
+#             sv = []
 
-            for train_indices, test_indices in kf.split(X):
+#             for train_indices, test_indices in kf.split(X):
 
-                X_train, X_test = X[train_indices], X[test_indices]
-                y_train, y_test = y[train_indices], y[test_indices]
+#                 X_train, X_test = X[train_indices], X[test_indices]
+#                 y_train, y_test = y[train_indices], y[test_indices]
 
-                scaler = StandardScaler()
-                scaler.fit(X_train)
+#                 scaler = StandardScaler()
+#                 scaler.fit(X_train)
 
-                X_train = scaler.transform(X_train)
-                X_test = scaler.transform(X_test)
+#                 X_train = scaler.transform(X_train)
+#                 X_test = scaler.transform(X_test)
 
-                model = model_class(kernel=Polynomial(M=i), lambda_=lambda_)
-                model = model.fit(X_train, y_train)
+#                 model = model_class(kernel=Polynomial(M=i), lambda_=lambda_)
+#                 model = model.fit(X_train, y_train)
 
-                predictions = model.predict(X_test)
+#                 predictions = model.predict(X_test)
 
-                if support_vectors:
-                    sv.append(len(model.X_support))
+#                 if support_vectors:
+#                     sv.append(len(model.X_support))
 
-                cv_scores.append(np.mean((predictions - y_test)**2))
+#                 cv_scores.append(np.mean((predictions - y_test)**2))
 
-            s.append(np.mean(cv_scores))
+#             s.append(np.mean(cv_scores))
             
 
-            if support_vectors:
-                average_svs.append(np.mean(sv))
-                ax.text(i-1, s[-1], f"{average_svs[-1]:.0f}", fontsize=9, ha='center', va='bottom')
+#             if support_vectors:
+#                 average_svs.append(np.mean(sv))
+#                 ax.text(i-1, s[-1], f"{average_svs[-1]:.0f}", fontsize=9, ha='center', va='bottom')
 
-        ax.plot(range(1, len(s)+1), s, label="λ = 1")
-        ax.grid(True)
-        ax.set_xlabel("Degree")
-        ax.set_ylabel("MSE")
-        ax.legend()
-        ax.set_yscale("log")
+#         ax.plot(range(1, len(s)+1), s, label="λ = 1")
+#         ax.grid(True)
+#         ax.set_xlabel("Degree")
+#         ax.set_ylabel("MSE")
+#         ax.legend()
+#         ax.set_yscale("log")
+
+# def CV_RBF(model_class, ax, lambda_, support_vectors=False):
+#     s = []
+#     average_svs = []
+#     sigmas = [0.001, 0.01, 0.1, 1, 2, 3, 4, 6, 10, 100]
+
+#     for i, sigma in enumerate(sigmas):
+#         kf = KFold(n_splits=5, shuffle=True, random_state=42) #!return num of splits to 10
+#         cv_scores = []
+#         sv = []
+        
+#         for train_indices, test_indices in kf.split(X):
+
+#             X_train, X_test = X[train_indices], X[test_indices]
+#             y_train, y_test = y[train_indices], y[test_indices]
+
+#             scaler = StandardScaler()
+#             scaler.fit(X_train)
+
+#             X_train = scaler.transform(X_train)
+#             X_test = scaler.transform(X_test)
+
+#             model = model_class(kernel=RBF(sigma=sigma), lambda_=lambda_)
+#             model = model.fit(X_train, y_train)
+
+#             predictions = model.predict(X_test)
+
+#             if support_vectors:
+#                 sv.append(len(model.X_support))
+
+#             cv_scores.append(np.mean((predictions - y_test)**2))
+
+#         s.append(np.mean(cv_scores))
+
+#         if support_vectors:
+#             average_svs.append(np.mean(sv))
+#             ax.text(i, s[-1], f"{average_svs[-1]:.0f}", fontsize=9, ha='center', va='bottom')
+
+#     ax.plot(range(len(s)), s, label="λ = 1")
+#     ax.grid(True)
+#     ax.set_xlabel("σ")
+#     ax.set_ylabel("MSE")
+#     ax.legend()
 
 def CV_RBF(model_class, ax, lambda_, support_vectors=False):
-    s = []
-    average_svs = []
+
+    MSEs = []
+    standard_errors = []
+    mean_support_vectors = []
     sigmas = [0.001, 0.01, 0.1, 1, 2, 3, 4, 6, 10, 100]
-
     for i, sigma in enumerate(sigmas):
-        kf = KFold(n_splits=5, shuffle=True, random_state=42) #!return num of splits to 10
-        cv_scores = []
-        sv = []
+
+        global support_vector_numbers #i love poor coding practices.
+        support_vector_numbers = []
+
+        m = Pipeline([
+            ("scaler", StandardScaler()),
+            ("Kernel Ridge Regression", model_class(kernel=RBF(sigma=sigma), lambda_=lambda_))
+        ])
+
+        predictions = cross_val_predict(m, X, y, cv=KFold(n_splits=10, shuffle=True, random_state=42))
         
-        for train_indices, test_indices in kf.split(X):
-
-            X_train, X_test = X[train_indices], X[test_indices]
-            y_train, y_test = y[train_indices], y[test_indices]
-
-            scaler = StandardScaler()
-            scaler.fit(X_train)
-
-            X_train = scaler.transform(X_train)
-            X_test = scaler.transform(X_test)
-
-            model = model_class(kernel=RBF(sigma=sigma), lambda_=lambda_)
-            model = model.fit(X_train, y_train)
-
-            predictions = model.predict(X_test)
-
-            if support_vectors:
-                sv.append(len(model.X_support))
-
-            cv_scores.append(np.mean((predictions - y_test)**2))
-
-        s.append(np.mean(cv_scores))
-
+        errors = np.square(predictions - y)
+        MSEs.append(np.mean(errors))
         if support_vectors:
-            average_svs.append(np.mean(sv))
-            ax.text(i, s[-1], f"{average_svs[-1]:.0f}", fontsize=9, ha='center', va='bottom')
+            mean_support_vectors.append(np.mean(support_vector_numbers))
+        standard_errors.append(np.std(errors)/np.sqrt(len(errors)))
+    
+    ax.errorbar(range(len(MSEs)), MSEs, yerr=standard_errors)
+    
+def CV_polynomial(model_class, ax, lambda_, support_vectors=False):
 
-    ax.plot(range(len(s)), s, label="λ = 1")
-    ax.grid(True)
-    ax.set_xlabel("σ")
-    ax.set_ylabel("MSE")
-    ax.legend()
+    MSEs = []
+    standard_errors = []
+    mean_support_vectors = []
+    for i in range(1, 11):
+
+        global support_vector_numbers #i love poor coding practices.
+        support_vector_numbers = []
+        
+        m = Pipeline([
+            ("scaler", StandardScaler()),
+            ("Kernel Ridge Regression", model_class(kernel=Polynomial(M=i), lambda_=lambda_))
+        ])
+
+        predictions = cross_val_predict(m, X, y, cv=KFold(n_splits=10, shuffle=True, random_state=42))
+        
+        errors = np.square(predictions - y)
+        MSEs.append(np.mean(errors))
+        if support_vectors:
+            mean_support_vectors.append(np.mean(support_vector_numbers))
+        standard_errors.append(np.std(errors)/np.sqrt(len(errors)))
+    
+    ax.errorbar(range(len(MSEs)), MSEs, yerr=standard_errors)
+    ax.set_yscale("log")
+
 
 if __name__ == "__main__":
     # pol = RBF(sigma=0.2)
@@ -333,28 +401,81 @@ if __name__ == "__main__":
     X, y = housing_data()
     fig, axes = plt.subplots(2, 2)
 
-    CV_polynomial(KernelizedRidgeRegression, axes[0][0], lambda_=1)
-    CV_polynomial(SVR, axes[0][1], lambda_=1, support_vectors=True)
-    CV_RBF(KernelizedRidgeRegression, axes[1][0], lambda_=1)
-    CV_RBF(SVR, axes[1][1], lambda_=1, support_vectors=True)
+    CV_polynomial(KRR_scikit, axes[0][0], lambda_=1)
+    CV_polynomial(SVR_scikit, axes[0][1], lambda_=1, support_vectors=True)
+    CV_RBF(KRR_scikit, axes[1][0], lambda_=1)
+    CV_RBF(SVR_scikit, axes[1][1], lambda_=1, support_vectors=True)
+
+
+    s = []
+    param_grid = {"Kernel Ridge Regression__lambda_": [0.0001, 0.001, 0.01, 0.1, 1, 10, 100]}
+    for i in range(1, 11):
+
+        m = Pipeline([
+                ("scaler", StandardScaler()),
+                ("Kernel Ridge Regression", KRR_scikit(kernel=Polynomial(M=i), lambda_=0.1))
+            ])
+
+        inner_cv = KFold(n_splits=5, shuffle=True, random_state=42)
+        outer_cv = KFold(n_splits=10, shuffle=True, random_state=42)
+
+        all_predictions = []
+        all_y = []
+
+        for train_idx, test_idx in outer_cv.split(X):
+
+            # Split the data for the outer fold
+            X_train, X_test = X[train_idx], X[test_idx]
+            y_train, y_test = y[train_idx], y[test_idx]
+
+            clf = GridSearchCV(estimator=m, param_grid=param_grid, cv=inner_cv, scoring="neg_mean_squared_error")
+            clf.fit(X_train, y_train)
+
+            best_lambda = clf.best_params_["Kernel Ridge Regression__lambda_"]
+
+            opt_model = Pipeline([
+                ("scaler", StandardScaler()),
+                ("Kernel Ridge Regression", KRR_scikit(kernel=Polynomial(M=i), lambda_=best_lambda))
+            ])
+
+            opt_model.fit(X_train, y_train)
+            predictions = opt_model.predict(X_test)
+            # predictions = cross_val_predict(opt_model, X=X, y=y, cv=outer_cv)
+            all_predictions.append(predictions)
+            all_y.append(y_test)
+        
+        errors = np.square(np.array(all_predictions) - np.array(all_y))
+        s.append(np.mean(errors))
+        # mean_support_vectors.append(np.mean(support_vector_numbers))
+        # standard_errors.append(np.std(errors)/np.sqrt(len(errors)))       
+
+    axes[0][0].plot(range(len(s)), s, color="red")
     plt.show()
+
 
     ##############################################################################
     #KFOLD USING WRAPPER
     ##############################################################################
-        # s = []
+    # s = []
+    # standard_errors = []
+    # mean_support_vectors = []
     # for i in range(1, 11):
 
+    #     support_vector_numbers = []
     #     m = Pipeline([
     #         ("scaler", StandardScaler()),
-    #         ("Kernel Ridge Regression", KRR_scikit(kernel=Polynomial(M=i), lambda_=1))
+    #         ("Kernel Ridge Regression", SVR_scikit(kernel=Polynomial(M=i), lambda_=1))
     #     ])
 
-    #     scores = cross_val_score(m, X, y, cv=KFold(n_splits=10, shuffle=True, random_state=42), scoring="neg_mean_squared_error")
-    #     s.append(np.mean(np.abs(scores)))
-
-    # axes[0].plot(range(len(s)), s)
-    # axes[0].set_yscale("log")
+    #     predictions = cross_val_predict(m, X, y, cv=KFold(n_splits=2, shuffle=True, random_state=42))
+        
+    #     errors = np.square(predictions - y)
+    #     s.append(np.mean(errors))
+    #     mean_support_vectors.append(np.mean(support_vector_numbers))
+    #     standard_errors.append(np.std(errors)/np.sqrt(len(errors)))
+    
+    # plt.errorbar(range(len(s)), s, yerr=standard_errors)
+    # plt.yscale("log")
     # plt.show()
 
     ###############################################################################
