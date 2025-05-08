@@ -343,8 +343,9 @@ def CV_RBF(model_class, ax, lambda_, support_vectors=False):
         if support_vectors:
             mean_support_vectors.append(np.mean(support_vector_numbers))
         standard_errors.append(np.std(errors)/np.sqrt(len(errors)))
-    
-    ax.errorbar(range(len(MSEs)), MSEs, yerr=standard_errors)
+
+    return MSEs, standard_errors, mean_support_vectors
+
     
 def CV_polynomial(model_class, ax, lambda_, support_vectors=False):
 
@@ -369,9 +370,22 @@ def CV_polynomial(model_class, ax, lambda_, support_vectors=False):
             mean_support_vectors.append(np.mean(support_vector_numbers))
         standard_errors.append(np.std(errors)/np.sqrt(len(errors)))
     
-    ax.errorbar(range(len(MSEs)), MSEs, yerr=standard_errors)
-    ax.set_yscale("log")
+    return MSEs, standard_errors, mean_support_vectors
 
+def save_np_arrays(MSEs, errors, support_vectors, name):
+    np.save(f"data/MSEs_{name}", MSEs)
+    np.save(f"data/errors_{name}", errors)
+    if support_vectors != []:
+        np.save(f"data/support_vectors_{name}", support_vectors)
+
+def read_np_arrays(name, sv=False):
+    MSEs = np.load(f"data/MSEs_{name}.npy")
+    errors = np.load(f"data/errors_{name}.npy")
+    if sv:
+        support_vectors  = np.load(f"data/support_vectors_{name}.npy")
+        return MSEs, errors, support_vectors
+
+    return MSEs, errors
 
 if __name__ == "__main__":
     # pol = RBF(sigma=0.2)
@@ -401,55 +415,71 @@ if __name__ == "__main__":
     X, y = housing_data()
     fig, axes = plt.subplots(2, 2)
 
-    CV_polynomial(KRR_scikit, axes[0][0], lambda_=1)
-    CV_polynomial(SVR_scikit, axes[0][1], lambda_=1, support_vectors=True)
-    CV_RBF(KRR_scikit, axes[1][0], lambda_=1)
-    CV_RBF(SVR_scikit, axes[1][1], lambda_=1, support_vectors=True)
+    # MSEs_KRR_polynomial, errors_KRR_polynomial, support_vectors_KRR_polynomial = CV_polynomial(KRR_scikit, axes[0][0], lambda_=1)
+    # save_np_arrays(MSEs_KRR_polynomial, errors_KRR_polynomial, support_vectors_KRR_polynomial, "KRR_polynomial")
+    # MSEs_SVR_polynomial, errors_SVR_polynomial, support_vectors_SVR_polynomial = CV_polynomial(SVR_scikit, axes[0][1], lambda_=1, support_vectors=True)
+    # save_np_arrays(MSEs_SVR_polynomial, errors_SVR_polynomial, support_vectors_SVR_polynomial, "SVR_polynomial")
+    # MSEs_KRR_RBF, errors_KRR_RBF, support_vectors_KRR_RBF = CV_RBF(KRR_scikit, axes[1][0], lambda_=1)
+    # save_np_arrays(MSEs_KRR_RBF, errors_KRR_RBF, support_vectors_KRR_RBF, "KRR_RBF")
+    # MSEs_SVR_RBF, errors_SVR_RBF, support_vectors_SVR_RBF = CV_RBF(SVR_scikit, axes[1][1], lambda_=1, support_vectors=True)
+    # save_np_arrays(MSEs_SVR_RBF, errors_SVR_RBF, support_vectors_SVR_RBF, "SVR_RBF")
 
+    MSEs_KRR_polynomial, errors_KRR_polynomial = read_np_arrays("KRR_polynomial")
+    MSEs_SVR_polynomial, errors_SVR_polynomial, support_vectors_SVR_polynomial = read_np_arrays("SVR_polynomial", True)
+    MSEs_KRR_RBF, errors_KRR_RBF = read_np_arrays("KRR_RBF")
+    MSEs_SVR_RBF, errors_SVR_RBF, support_vectors_SVR_RBF = read_np_arrays("SVR_RBF", True)
 
-    s = []
-    param_grid = {"Kernel Ridge Regression__lambda_": [0.0001, 0.001, 0.01, 0.1, 1, 10, 100]}
-    for i in range(1, 11):
+    axes[0][0].errorbar(range(len(MSEs_KRR_polynomial)), MSEs_KRR_polynomial, yerr=errors_KRR_polynomial)
+    axes[0][1].errorbar(range(len(MSEs_SVR_polynomial)), MSEs_SVR_polynomial, yerr=errors_SVR_polynomial)
+    axes[1][0].errorbar(range(len(MSEs_KRR_RBF)), MSEs_KRR_RBF, yerr=errors_KRR_RBF)
+    axes[1][1].errorbar(range(len(MSEs_SVR_RBF)), MSEs_SVR_RBF, yerr=errors_SVR_RBF)
 
-        m = Pipeline([
-                ("scaler", StandardScaler()),
-                ("Kernel Ridge Regression", KRR_scikit(kernel=Polynomial(M=i), lambda_=0.1))
-            ])
+    axes[0][0].set_yscale("log")
+    axes[0][1].set_yscale("log")
 
-        inner_cv = KFold(n_splits=5, shuffle=True, random_state=42)
-        outer_cv = KFold(n_splits=10, shuffle=True, random_state=42)
+    # s = []
+    # param_grid = {"Kernel Ridge Regression__lambda_": [0.0001, 0.001, 0.01, 0.1, 1, 10, 100]}
+    # for i in range(1, 11):
 
-        all_predictions = []
-        all_y = []
+    #     m = Pipeline([
+    #             ("scaler", StandardScaler()),
+    #             ("Kernel Ridge Regression", KRR_scikit(kernel=Polynomial(M=i), lambda_=0.1))
+    #         ])
 
-        for train_idx, test_idx in outer_cv.split(X):
+    #     inner_cv = KFold(n_splits=5, shuffle=True, random_state=42)
+    #     outer_cv = KFold(n_splits=10, shuffle=True, random_state=42)
 
-            # Split the data for the outer fold
-            X_train, X_test = X[train_idx], X[test_idx]
-            y_train, y_test = y[train_idx], y[test_idx]
+    #     all_predictions = []
+    #     all_y = []
 
-            clf = GridSearchCV(estimator=m, param_grid=param_grid, cv=inner_cv, scoring="neg_mean_squared_error")
-            clf.fit(X_train, y_train)
+    #     for train_idx, test_idx in outer_cv.split(X):
 
-            best_lambda = clf.best_params_["Kernel Ridge Regression__lambda_"]
+    #         # Split the data for the outer fold
+    #         X_train, X_test = X[train_idx], X[test_idx]
+    #         y_train, y_test = y[train_idx], y[test_idx]
 
-            opt_model = Pipeline([
-                ("scaler", StandardScaler()),
-                ("Kernel Ridge Regression", KRR_scikit(kernel=Polynomial(M=i), lambda_=best_lambda))
-            ])
+    #         clf = GridSearchCV(estimator=m, param_grid=param_grid, cv=inner_cv, scoring="neg_mean_squared_error")
+    #         clf.fit(X_train, y_train)
 
-            opt_model.fit(X_train, y_train)
-            predictions = opt_model.predict(X_test)
-            # predictions = cross_val_predict(opt_model, X=X, y=y, cv=outer_cv)
-            all_predictions.append(predictions)
-            all_y.append(y_test)
+    #         best_lambda = clf.best_params_["Kernel Ridge Regression__lambda_"]
+
+    #         opt_model = Pipeline([
+    #             ("scaler", StandardScaler()),
+    #             ("Kernel Ridge Regression", KRR_scikit(kernel=Polynomial(M=i), lambda_=best_lambda))
+    #         ])
+
+    #         opt_model.fit(X_train, y_train)
+    #         predictions = opt_model.predict(X_test)
+    #         # predictions = cross_val_predict(opt_model, X=X, y=y, cv=outer_cv)
+    #         all_predictions.append(predictions)
+    #         all_y.append(y_test)
         
-        errors = np.square(np.array(all_predictions) - np.array(all_y))
-        s.append(np.mean(errors))
-        # mean_support_vectors.append(np.mean(support_vector_numbers))
-        # standard_errors.append(np.std(errors)/np.sqrt(len(errors)))       
+    #     errors = np.square(np.array(all_predictions) - np.array(all_y))
+    #     s.append(np.mean(errors))
+    #     # mean_support_vectors.append(np.mean(support_vector_numbers))
+    #     # standard_errors.append(np.std(errors)/np.sqrt(len(errors)))       
 
-    axes[0][0].plot(range(len(s)), s, color="red")
+    # axes[0][0].plot(range(len(s)), s, color="red")
     plt.show()
 
 
