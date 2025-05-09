@@ -345,8 +345,7 @@ def CV_RBF(model_class, ax, lambda_, support_vectors=False):
         standard_errors.append(np.std(errors)/np.sqrt(len(errors)))
 
     return MSEs, standard_errors, mean_support_vectors
-
-    
+   
 def CV_polynomial(model_class, ax, lambda_, support_vectors=False):
 
     MSEs = []
@@ -363,7 +362,7 @@ def CV_polynomial(model_class, ax, lambda_, support_vectors=False):
         ])
 
         predictions = cross_val_predict(m, X, y, cv=KFold(n_splits=10, shuffle=True, random_state=42))
-        
+            
         errors = np.square(predictions - y)
         MSEs.append(np.mean(errors))
         if support_vectors:
@@ -386,6 +385,44 @@ def read_np_arrays(name, sv=False):
         return MSEs, errors, support_vectors
 
     return MSEs, errors
+
+def internal_CV(X, y, model, kernel):
+
+    m = Pipeline([
+                ("scaler", StandardScaler()),
+                ("Kernel Ridge Regression", model(kernel=kernel, lambda_=0.1))
+            ])
+
+    inner_cv = KFold(n_splits=5, shuffle=True, random_state=42)
+    outer_cv = KFold(n_splits=10, shuffle=True, random_state=42)
+
+    all_predictions = []
+    all_y = []
+    param_grid = {"Kernel Ridge Regression__lambda_": [0.0001, 0.001, 0.01, 0.1, 1, 10, 100]}
+
+    for train_idx, test_idx in outer_cv.split(X):
+
+            # Split the data for the outer fold
+            X_train, X_test = X[train_idx], X[test_idx]
+            y_train, y_test = y[train_idx], y[test_idx]
+
+            clf = GridSearchCV(estimator=m, param_grid=param_grid, cv=inner_cv, scoring="neg_mean_squared_error")
+            clf.fit(X_train, y_train)
+
+            best_lambda = clf.best_params_["Kernel Ridge Regression__lambda_"]
+
+            opt_model = Pipeline([
+                ("scaler", StandardScaler()),
+                ("Kernel Ridge Regression", model(kernel=kernel, lambda_=best_lambda))
+            ])
+
+            opt_model.fit(X_train, y_train)
+            predictions = opt_model.predict(X_test)
+            # predictions = cross_val_predict(opt_model, X=X, y=y, cv=outer_cv)
+            all_predictions.append(predictions)
+            all_y.append(y_test)
+
+    return all_predictions, all_y
 
 if __name__ == "__main__":
     # pol = RBF(sigma=0.2)
@@ -429,58 +466,29 @@ if __name__ == "__main__":
     MSEs_KRR_RBF, errors_KRR_RBF = read_np_arrays("KRR_RBF")
     MSEs_SVR_RBF, errors_SVR_RBF, support_vectors_SVR_RBF = read_np_arrays("SVR_RBF", True)
 
-    axes[0][0].errorbar(range(len(MSEs_KRR_polynomial)), MSEs_KRR_polynomial, yerr=errors_KRR_polynomial)
-    axes[0][1].errorbar(range(len(MSEs_SVR_polynomial)), MSEs_SVR_polynomial, yerr=errors_SVR_polynomial)
-    axes[1][0].errorbar(range(len(MSEs_KRR_RBF)), MSEs_KRR_RBF, yerr=errors_KRR_RBF)
-    axes[1][1].errorbar(range(len(MSEs_SVR_RBF)), MSEs_SVR_RBF, yerr=errors_SVR_RBF)
+    axes[0][0].errorbar(range(len(MSEs_KRR_polynomial)), MSEs_KRR_polynomial, yerr=errors_KRR_polynomial, linestyle="", marker="o", markersize="3")
+    axes[0][1].errorbar(range(len(MSEs_SVR_polynomial)), MSEs_SVR_polynomial, yerr=errors_SVR_polynomial, linestyle="", marker="o", markersize="3")
+    axes[1][0].errorbar(range(len(MSEs_KRR_RBF)), MSEs_KRR_RBF, yerr=errors_KRR_RBF, linestyle="", marker="o", markersize="3")
+    axes[1][1].errorbar(range(len(MSEs_SVR_RBF)), MSEs_SVR_RBF, yerr=errors_SVR_RBF, linestyle="", marker="o", markersize="3")
 
     axes[0][0].set_yscale("log")
     axes[0][1].set_yscale("log")
 
-    # s = []
-    # param_grid = {"Kernel Ridge Regression__lambda_": [0.0001, 0.001, 0.01, 0.1, 1, 10, 100]}
-    # for i in range(1, 11):
+    s = []
+    standard_errors = []
+    param_grid = {"Kernel Ridge Regression__lambda_": [0.0001, 0.001, 0.01, 0.1, 1, 10, 100]}
+    for i in range(1, 11):
 
-    #     m = Pipeline([
-    #             ("scaler", StandardScaler()),
-    #             ("Kernel Ridge Regression", KRR_scikit(kernel=Polynomial(M=i), lambda_=0.1))
-    #         ])
-
-    #     inner_cv = KFold(n_splits=5, shuffle=True, random_state=42)
-    #     outer_cv = KFold(n_splits=10, shuffle=True, random_state=42)
-
-    #     all_predictions = []
-    #     all_y = []
-
-    #     for train_idx, test_idx in outer_cv.split(X):
-
-    #         # Split the data for the outer fold
-    #         X_train, X_test = X[train_idx], X[test_idx]
-    #         y_train, y_test = y[train_idx], y[test_idx]
-
-    #         clf = GridSearchCV(estimator=m, param_grid=param_grid, cv=inner_cv, scoring="neg_mean_squared_error")
-    #         clf.fit(X_train, y_train)
-
-    #         best_lambda = clf.best_params_["Kernel Ridge Regression__lambda_"]
-
-    #         opt_model = Pipeline([
-    #             ("scaler", StandardScaler()),
-    #             ("Kernel Ridge Regression", KRR_scikit(kernel=Polynomial(M=i), lambda_=best_lambda))
-    #         ])
-
-    #         opt_model.fit(X_train, y_train)
-    #         predictions = opt_model.predict(X_test)
-    #         # predictions = cross_val_predict(opt_model, X=X, y=y, cv=outer_cv)
-    #         all_predictions.append(predictions)
-    #         all_y.append(y_test)
+        all_predictions, all_y = internal_CV(X, y, KRR_scikit, kernel=Polynomial(M=i))
         
-    #     errors = np.square(np.array(all_predictions) - np.array(all_y))
-    #     s.append(np.mean(errors))
-    #     # mean_support_vectors.append(np.mean(support_vector_numbers))
-    #     # standard_errors.append(np.std(errors)/np.sqrt(len(errors)))       
+        errors = np.square(np.array(all_predictions).flatten() - np.array(all_y).flatten())
+        s.append(np.mean(errors))
+        # mean_support_vectors.append(np.mean(support_vector_numbers))
+        standard_errors.append(np.std(errors)/np.sqrt(len(errors)))       
 
-    # axes[0][0].plot(range(len(s)), s, color="red")
-    plt.show()
+    axes[0][0].errorbar(range(len(s)), s, color="red", yerr=standard_errors, linestyle="", marker="o", markersize="3")
+    # print(standard_errors)
+    # plt.show()
 
 
     ##############################################################################
@@ -504,9 +512,9 @@ if __name__ == "__main__":
     #     mean_support_vectors.append(np.mean(support_vector_numbers))
     #     standard_errors.append(np.std(errors)/np.sqrt(len(errors)))
     
-    # plt.errorbar(range(len(s)), s, yerr=standard_errors)
+    # plt.errorbar(range(len(s)), s, yerr=standard_errors, linestyle="", marker="o", markersize="3")
     # plt.yscale("log")
-    # plt.show()
+    plt.show()
 
     ###############################################################################
     #KFOLD WITHOUT WRAPPER
