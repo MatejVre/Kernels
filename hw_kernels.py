@@ -51,7 +51,7 @@ class KernelizedRidgeRegression():
     
 class SVR():
 
-    def __init__(self, kernel, lambda_=0.001, epsilon=0.1):
+    def __init__(self, kernel, lambda_=0.001, epsilon=15):
         self.kernel = kernel
         self.lambda_ = lambda_
         self.C = 1/self.lambda_
@@ -421,11 +421,13 @@ if __name__ == "__main__":
     # axes[1].set_title("SVR-RBF Kernel, σ = 1, λ = 0.001, ε = 0.5")
     # plt.savefig("sine2.pdf", bbox_inches="tight")
 
+    X, y = housing_data()
+    fig, axes = plt.subplots(2, 1, sharey="col", sharex="col", figsize=(10, 8))
 
 
     # MSEs_KRR_polynomial, errors_KRR_polynomial, support_vectors_KRR_polynomial = CV_polynomial(X, y, KRR_scikit, axes[0][0], lambda_=1)
     # save_np_arrays(MSEs_KRR_polynomial, errors_KRR_polynomial, support_vectors_KRR_polynomial, "KRR_polynomial")
-    # MSEs_SVR_polynomial, errors_SVR_polynomial, support_vectors_SVR_polynomial = CV_polynomial(X, y, SVR_scikit, axes[0][1], lambda_=1, support_vectors=True)
+    # MSEs_SVR_polynomial, errors_SVR_polynomial, support_vectors_SVR_polynomial = CV_polynomial(X, y, SVR_scikit, axes[1], lambda_=1, support_vectors=True)
     # save_np_arrays(MSEs_SVR_polynomial, errors_SVR_polynomial, support_vectors_SVR_polynomial, "SVR_polynomial")
     # MSEs_KRR_RBF, errors_KRR_RBF, support_vectors_KRR_RBF = CV_RBF(X, y, KRR_scikit, axes[1][0], lambda_=1)
     # save_np_arrays(MSEs_KRR_RBF, errors_KRR_RBF, support_vectors_KRR_RBF, "KRR_RBF")
@@ -445,8 +447,7 @@ if __name__ == "__main__":
     # save_np_arrays(MSEs_SVR_RBF_opt_lambda, errors_SVR_RBF_opt_lambda, support_vectors_SVR_RBF_opt_lambda, "SVR_RBF_opt_lambda")
     # np.save("data/lambdas_SVR_RBF_opt_lambda", lambdas_SVR_RBF_opt_lambda)
 
-    X, y = housing_data()
-    fig, axes = plt.subplots(2, 1, sharey="col", sharex="col", figsize=(10, 8))
+
 
     MSEs_KRR_polynomial, errors_KRR_polynomial = read_np_arrays("KRR_polynomial")
     MSEs_SVR_polynomial, errors_SVR_polynomial, support_vectors_SVR_polynomial = read_np_arrays("SVR_polynomial", True)
@@ -455,7 +456,7 @@ if __name__ == "__main__":
 
     
     MSEs_KRR_polynomial_opt_lambda, errors_KRR_polynomial_opt_lambda = read_np_arrays("KRR_polynomial_opt_lambda")
-    MSEs_SVR_polynomial_opt_lambda, errors_SVR_polynomial_opt_lambda, support_vectors_SRV_polynomial_opt_lambda = read_np_arrays("SVR_polynomial_opt_lambda", True)
+    MSEs_SVR_polynomial_opt_lambda, errors_SVR_polynomial_opt_lambda, support_vectors_SVR_polynomial_opt_lambda = read_np_arrays("SVR_polynomial_opt_lambda", True)
     MSEs_KRR_RBF_opt_lambda, errors_KRR_RBF_opt_lambda = read_np_arrays("KRR_RBF_opt_lambda")
     MSEs_SVR_RBF_opt_lambda, errors_SVR_RBF_opt_lambda, support_vectors_SVR_RBF_opt_lambda = read_np_arrays("SVR_RBF_opt_lambda", True)
 
@@ -467,6 +468,12 @@ if __name__ == "__main__":
     axes[0].errorbar(range(1, len(MSEs_KRR_polynomial_opt_lambda) + 1), MSEs_KRR_polynomial_opt_lambda, color="red", yerr=errors_KRR_polynomial_opt_lambda, linestyle="", marker=1, capsize=2, markersize="10", label="Optimal λ")
     axes[1].errorbar(range(1, len(MSEs_SVR_polynomial_opt_lambda) + 1), MSEs_SVR_polynomial_opt_lambda, color="red", yerr=errors_SVR_polynomial_opt_lambda, linestyle="", marker=1, capsize=2, markersize="10", label="Optimal λ")
     axes[0].set_yscale("log")
+
+    for i in range(1, 11):
+        axes[1].text(i-0.3, MSEs_SVR_polynomial[i-1] + 20, f"{support_vectors_SVR_polynomial[i-1]}", color="blue")
+
+    for j in range(1, 11):
+        axes[1].text(j+0.1, MSEs_SVR_polynomial_opt_lambda[j-1] - 45, f"{support_vectors_SVR_polynomial_opt_lambda[j-1]:.1f}", color="red")
 
     axes[0].grid(True)
     axes[1].grid(True)
@@ -481,6 +488,7 @@ if __name__ == "__main__":
 
     axes[0].legend()
     axes[1].legend()
+    
     plt.show()
 
     
