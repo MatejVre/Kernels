@@ -1,3 +1,4 @@
+from matplotlib.ticker import LogFormatter, LogLocator
 import numpy as np
 from sklearn.svm import SVC
 from sklearn.metrics.pairwise import rbf_kernel
@@ -51,7 +52,7 @@ class KernelizedRidgeRegression():
     
 class SVR():
 
-    def __init__(self, kernel, lambda_=0.001, epsilon=15):
+    def __init__(self, kernel, lambda_=0.001, epsilon=5):
         self.kernel = kernel
         self.lambda_ = lambda_
         self.C = 1/self.lambda_
@@ -422,7 +423,7 @@ if __name__ == "__main__":
     # plt.savefig("sine2.pdf", bbox_inches="tight")
 
     X, y = housing_data()
-    fig, axes = plt.subplots(2, 1, sharey="col", sharex="col", figsize=(10, 8))
+    fig, axes = plt.subplots(1, 2, sharey="row", sharex="row", figsize=(13, 5))
 
 
     # MSEs_KRR_polynomial, errors_KRR_polynomial, support_vectors_KRR_polynomial = CV_polynomial(X, y, KRR_scikit, axes[0][0], lambda_=1)
@@ -431,7 +432,7 @@ if __name__ == "__main__":
     # save_np_arrays(MSEs_SVR_polynomial, errors_SVR_polynomial, support_vectors_SVR_polynomial, "SVR_polynomial")
     # MSEs_KRR_RBF, errors_KRR_RBF, support_vectors_KRR_RBF = CV_RBF(X, y, KRR_scikit, axes[1][0], lambda_=1)
     # save_np_arrays(MSEs_KRR_RBF, errors_KRR_RBF, support_vectors_KRR_RBF, "KRR_RBF")
-    # MSEs_SVR_RBF, errors_SVR_RBF, support_vectors_SVR_RBF = CV_RBF(X, y, SVR_scikit, axes[1][1], lambda_=1, support_vectors=True)
+    # MSEs_SVR_RBF, errors_SVR_RBF, support_vectors_SVR_RBF = CV_RBF(X, y, SVR_scikit, axes[1], lambda_=1, support_vectors=True)
     # save_np_arrays(MSEs_SVR_RBF, errors_SVR_RBF, support_vectors_SVR_RBF, "SVR_RBF")
 
     # MSEs_KRR_polynomial_opt_lambda, errors_KRR_polynomial_opt_lambda, support_vectors_KRR_polynomial_opt_lambda, lambdas_KRR_polynomial_opt_lambda = CV_polynomial_internal(X, y , KRR_scikit)
@@ -462,54 +463,83 @@ if __name__ == "__main__":
 
 
 
-    axes[0].errorbar(range(1, len(MSEs_KRR_polynomial)+1), MSEs_KRR_polynomial, yerr=errors_KRR_polynomial, linestyle="", marker=0, capsize=2, markersize="10", label="λ = 1")
-    axes[1].errorbar(range(1, len(MSEs_SVR_polynomial)+1), MSEs_SVR_polynomial, yerr=errors_SVR_polynomial, linestyle="", marker=0, capsize=2, markersize="10", label="λ = 1")
+    # axes[0].errorbar(range(1, len(MSEs_KRR_polynomial)+1), MSEs_KRR_polynomial, yerr=errors_KRR_polynomial, linestyle="", marker=0, capsize=2, markersize="10", label="λ = 1")
+    # axes[1].errorbar(range(1, len(MSEs_SVR_polynomial)+1), MSEs_SVR_polynomial, yerr=errors_SVR_polynomial, linestyle="", marker=0, capsize=2, markersize="10", label="λ = 1")
 
-    axes[0].errorbar(range(1, len(MSEs_KRR_polynomial_opt_lambda) + 1), MSEs_KRR_polynomial_opt_lambda, color="red", yerr=errors_KRR_polynomial_opt_lambda, linestyle="", marker=1, capsize=2, markersize="10", label="Optimal λ")
-    axes[1].errorbar(range(1, len(MSEs_SVR_polynomial_opt_lambda) + 1), MSEs_SVR_polynomial_opt_lambda, color="red", yerr=errors_SVR_polynomial_opt_lambda, linestyle="", marker=1, capsize=2, markersize="10", label="Optimal λ")
-    axes[0].set_yscale("log")
+    # axes[0].errorbar(range(1, len(MSEs_KRR_polynomial_opt_lambda) + 1), MSEs_KRR_polynomial_opt_lambda, color="red", yerr=errors_KRR_polynomial_opt_lambda, linestyle="", marker=1, capsize=2, markersize="10", label="Optimal λ")
+    # axes[1].errorbar(range(1, len(MSEs_SVR_polynomial_opt_lambda) + 1), MSEs_SVR_polynomial_opt_lambda, color="red", yerr=errors_SVR_polynomial_opt_lambda, linestyle="", marker=1, capsize=2, markersize="10", label="Optimal λ")
+    # axes[0].set_yscale("log")
 
-    for i in range(1, 11):
-        axes[1].text(i-0.3, MSEs_SVR_polynomial[i-1] + 20, f"{support_vectors_SVR_polynomial[i-1]}", color="blue")
+    # for i in range(1, 11):
+    #     axes[1].text(i-0.4, MSEs_SVR_polynomial[i-1] + 0.5 * MSEs_SVR_polynomial[i-1], f"{support_vectors_SVR_polynomial[i-1]:.0f}", color="blue")
 
-    for j in range(1, 11):
-        axes[1].text(j+0.1, MSEs_SVR_polynomial_opt_lambda[j-1] - 45, f"{support_vectors_SVR_polynomial_opt_lambda[j-1]:.1f}", color="red")
+    # for j in range(1, 11):
+    #     axes[1].text(j+0.2, MSEs_SVR_polynomial_opt_lambda[j-1] - 0.5 * MSEs_SVR_polynomial_opt_lambda[j-1], f"{support_vectors_SVR_polynomial_opt_lambda[j-1]:.0f}", color="red")
+
+    # axes[0].grid(True)
+    # axes[1].grid(True)
+    # axes[0].set_xlabel("Polynomial Degree")
+    # axes[1].set_xlabel("Polynomial Degree")
+    # axes[0].set_ylabel("MSE")
+    # axes[1].set_ylabel("MSE")
+    # axes[0].set_title("Kernel Ridge Regression")
+    # axes[1].set_title("Support Vector Regression, ε = 15")
+
+    # axes[1].set_xticks(range(1,11))
+
+    # axes[0].legend(loc="upper left")
+    # axes[1].legend(loc="upper left")
+    # plt.savefig("rbf_comparison.pdf", bbox_inches="tight")
+    # plt.show()
+
+    sigmas = [0.001, 0.01, 0.1, 1, 2, 3, 4, 6, 10, 100]
+    axes[0].errorbar(sigmas, MSEs_KRR_RBF, yerr=errors_KRR_RBF, linestyle="", marker=0, capsize=2, markersize="10", label="λ = 1")
+    axes[1].errorbar(sigmas, MSEs_SVR_RBF, yerr=errors_SVR_RBF, linestyle="", marker=0, capsize=2, markersize="10", label="λ = 1")
+
+
+    axes[0].set_xscale("log")
+    # axes[0].set_xticks(range(len(MSEs_KRR_RBF)), [0.001, 0.01, 0.1, 1, 2, 3, 4, 6, 10, 100])
+    axes[0].xaxis.set_major_locator(LogLocator(base=10))
+    axes[0].xaxis.set_major_formatter(LogFormatter(base=10, labelOnlyBase=True))
+
+    axes[0].errorbar(sigmas, MSEs_KRR_RBF_opt_lambda, color="red", yerr=errors_KRR_RBF_opt_lambda, linestyle="", marker=1, capsize=2, markersize="10", label="Optimal λ")
+    axes[1].errorbar(sigmas, MSEs_SVR_RBF_opt_lambda, color="red", yerr=errors_SVR_RBF_opt_lambda, linestyle="", marker=1, capsize=2, markersize="10", label="Optimal λ")
+    
+    for idx, sigma in enumerate(sigmas):
+        axes[1].annotate(
+        f"{support_vectors_SVR_RBF[idx]:.0f}",
+        xy=(sigma, MSEs_SVR_RBF[idx] + 5),
+        xytext=(0, 10),  # offset in points
+        textcoords='offset points',
+        ha='center',
+        color='blue',
+        fontsize=8
+    )
+
+    for idx, sigma in enumerate(sigmas):
+        axes[1].annotate(
+        f"{support_vectors_SVR_RBF_opt_lambda[idx]:.0f}",
+        xy=(sigma, MSEs_SVR_RBF_opt_lambda[idx] - 5),
+        xytext=(0, -12),
+        textcoords='offset points',
+        ha='center',
+        color='red',
+        fontsize=8
+    )
+
+
 
     axes[0].grid(True)
     axes[1].grid(True)
-    axes[0].set_xlabel("Polynomial Degree")
-    axes[1].set_xlabel("Polynomial Degree")
-    axes[0].set_ylabel("MSE")
-    axes[1].set_ylabel("MSE")
-    axes[0].set_title("Kernel Ridge Regression")
-    axes[1].set_title("Support Vector Regression")
-
-    axes[1].set_xticks(range(1,11))
 
     axes[0].legend()
     axes[1].legend()
-    
+    axes[0].set_title("Kernel Ridge Regression")
+    axes[1].set_title("Support Vector Regression, ε = 5")
+    axes[0].set_xlabel("σ")
+    axes[1].set_xlabel("σ")
+    plt.savefig("rbf_comparison.pdf", bbox_inches="tight")
     plt.show()
-
-    
-    # axes[1][0].errorbar(range(len(MSEs_KRR_RBF)), MSEs_KRR_RBF, yerr=errors_KRR_RBF, linestyle="", marker="o", markersize="3", label="λ = 1")
-    # axes[1][1].errorbar(range(len(MSEs_SVR_RBF)), MSEs_SVR_RBF, yerr=errors_SVR_RBF, linestyle="", marker="o", markersize="3", label="λ = 1")
-
-
-    # axes[0][1].set_yscale("log")
-
-
-
-    
-    # axes[1][0].errorbar(range(len(MSEs_KRR_RBF_opt_lambda)), MSEs_KRR_RBF_opt_lambda, color="red", yerr=errors_KRR_RBF_opt_lambda, linestyle="", marker="o", markersize="3", label="Optimal λ")
-    # axes[1][1].errorbar(range(len(MSEs_SVR_RBF_opt_lambda)), MSEs_SVR_RBF_opt_lambda, color="red", yerr=errors_SVR_RBF_opt_lambda, linestyle="", marker="o", markersize="3", label="Optimal λ")
-    
-
-    # axes[1][0].grid(True)
-    # axes[1][1].grid(True)
-
-    # axes[1][0].legend()
-    # axes[1][1].legend()
     
 
 
