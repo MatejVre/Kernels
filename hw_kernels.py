@@ -8,7 +8,7 @@ from cvxopt import matrix, solvers
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import cross_val_score, GridSearchCV, KFold, cross_val_predict
+from sklearn.model_selection import cross_val_score, GridSearchCV, KFold, cross_val_predict, train_test_split
 
 class Polynomial():
 
@@ -31,6 +31,23 @@ class RBF():
         dist = a - 2*np.dot(A, B.T) + b
         K = (np.exp(-(dist / (2*(self.sigma**2)))))
         return K.squeeze() if A.shape[0] == 1 or B.shape[0] == 1 else K
+
+class HOG():
+
+    def __init__(self, gamma):
+        self.gamma = gamma
+
+    def __call__(self, im1, im2):
+        hog = cv2.HOGDescriptor()
+        hog1 = np.array([hog.compute(img) for img in im1])
+        hog2 = np.array([hog.compute(img) for img in im2])
+
+        X_norm = np.sum(hog1**2, axis=1).reshape(-1, 1)
+        Y_norm = np.sum(hog2**2, axis=1).reshape(1, -1)
+        dist_sq = X_norm + Y_norm - 2 * np.dot(hog1, hog2.T)
+
+        K = np.exp(-self.gamma * dist_sq)
+        return K
 
 class KernelizedRidgeRegression():
 
@@ -257,7 +274,7 @@ def CV_RBF(X, y, model_class, ax, lambda_, support_vectors=False):
             ("Kernel Ridge Regression", model_class(kernel=RBF(sigma=sigma), lambda_=lambda_))
         ])
 
-        predictions = cross_val_predict(m, X, y, cv=KFold(n_splits=10, shuffle=True, random_state=42))
+        predictions = cross_val_predict(m, X, y, cv=KFold(n_splits=10, shuffle=True, random_state=42), n_jobs=-1)
         
         errors = np.square(predictions - y)
         MSEs.append(np.mean(errors))
@@ -282,7 +299,7 @@ def CV_polynomial(X, y, model_class, ax, lambda_, support_vectors=False):
             ("Kernel Ridge Regression", model_class(kernel=Polynomial(M=i), lambda_=lambda_))
         ])
 
-        predictions = cross_val_predict(m, X, y, cv=KFold(n_splits=10, shuffle=True, random_state=42))
+        predictions = cross_val_predict(m, X, y, cv=KFold(n_splits=10, shuffle=True, random_state=42), n_jobs=-1)
             
         errors = np.square(predictions - y)
         MSEs.append(np.mean(errors))
@@ -331,7 +348,7 @@ def internal_CV(X, y, model, kernel):
             X_train, X_test = X[train_idx], X[test_idx]
             y_train, y_test = y[train_idx], y[test_idx]
 
-            clf = GridSearchCV(estimator=m, param_grid=param_grid, cv=inner_cv, scoring="neg_mean_squared_error")
+            clf = GridSearchCV(estimator=m, param_grid=param_grid, cv=inner_cv, scoring="neg_mean_squared_error", n_jobs=-1)
             clf.fit(X_train, y_train)
 
             best_lambda = clf.best_params_["Regression__lambda_"]
@@ -426,11 +443,11 @@ if __name__ == "__main__":
     fig, axes = plt.subplots(1, 2, sharey="row", sharex="row", figsize=(13, 5))
 
 
-    # MSEs_KRR_polynomial, errors_KRR_polynomial, support_vectors_KRR_polynomial = CV_polynomial(X, y, KRR_scikit, axes[0][0], lambda_=1)
+    # MSEs_KRR_polynomial, errors_KRR_polynomial, support_vectors_KRR_polynomial = CV_polynomial(X, y, KRR_scikit, axes[0], lambda_=1)
     # save_np_arrays(MSEs_KRR_polynomial, errors_KRR_polynomial, support_vectors_KRR_polynomial, "KRR_polynomial")
     # MSEs_SVR_polynomial, errors_SVR_polynomial, support_vectors_SVR_polynomial = CV_polynomial(X, y, SVR_scikit, axes[1], lambda_=1, support_vectors=True)
     # save_np_arrays(MSEs_SVR_polynomial, errors_SVR_polynomial, support_vectors_SVR_polynomial, "SVR_polynomial")
-    # MSEs_KRR_RBF, errors_KRR_RBF, support_vectors_KRR_RBF = CV_RBF(X, y, KRR_scikit, axes[1][0], lambda_=1)
+    # MSEs_KRR_RBF, errors_KRR_RBF, support_vectors_KRR_RBF = CV_RBF(X, y, KRR_scikit, axes[1], lambda_=1)
     # save_np_arrays(MSEs_KRR_RBF, errors_KRR_RBF, support_vectors_KRR_RBF, "KRR_RBF")
     # MSEs_SVR_RBF, errors_SVR_RBF, support_vectors_SVR_RBF = CV_RBF(X, y, SVR_scikit, axes[1], lambda_=1, support_vectors=True)
     # save_np_arrays(MSEs_SVR_RBF, errors_SVR_RBF, support_vectors_SVR_RBF, "SVR_RBF")
@@ -455,13 +472,14 @@ if __name__ == "__main__":
     MSEs_KRR_RBF, errors_KRR_RBF = read_np_arrays("KRR_RBF")
     MSEs_SVR_RBF, errors_SVR_RBF, support_vectors_SVR_RBF = read_np_arrays("SVR_RBF", True)
 
-    
     MSEs_KRR_polynomial_opt_lambda, errors_KRR_polynomial_opt_lambda = read_np_arrays("KRR_polynomial_opt_lambda")
     MSEs_SVR_polynomial_opt_lambda, errors_SVR_polynomial_opt_lambda, support_vectors_SVR_polynomial_opt_lambda = read_np_arrays("SVR_polynomial_opt_lambda", True)
     MSEs_KRR_RBF_opt_lambda, errors_KRR_RBF_opt_lambda = read_np_arrays("KRR_RBF_opt_lambda")
     MSEs_SVR_RBF_opt_lambda, errors_SVR_RBF_opt_lambda, support_vectors_SVR_RBF_opt_lambda = read_np_arrays("SVR_RBF_opt_lambda", True)
 
-
+    ##########################################################################################################################
+    ###PLOTTING POLYNOMIAL
+    ##########################################################################################################################
 
     # axes[0].errorbar(range(1, len(MSEs_KRR_polynomial)+1), MSEs_KRR_polynomial, yerr=errors_KRR_polynomial, linestyle="", marker=0, capsize=2, markersize="10", label="λ = 1")
     # axes[1].errorbar(range(1, len(MSEs_SVR_polynomial)+1), MSEs_SVR_polynomial, yerr=errors_SVR_polynomial, linestyle="", marker=0, capsize=2, markersize="10", label="λ = 1")
@@ -492,100 +510,121 @@ if __name__ == "__main__":
     # plt.savefig("rbf_comparison.pdf", bbox_inches="tight")
     # plt.show()
 
-    sigmas = [0.001, 0.01, 0.1, 1, 2, 3, 4, 6, 10, 100]
-    axes[0].errorbar(sigmas, MSEs_KRR_RBF, yerr=errors_KRR_RBF, linestyle="", marker=0, capsize=2, markersize="10", label="λ = 1")
-    axes[1].errorbar(sigmas, MSEs_SVR_RBF, yerr=errors_SVR_RBF, linestyle="", marker=0, capsize=2, markersize="10", label="λ = 1")
+    ##########################################################################################################################
+    ###PLOTTING RBF
+    ##########################################################################################################################
+    # sigmas = [0.001, 0.01, 0.1, 1, 2, 3, 4, 6, 10, 100]
+    # axes[0].errorbar(sigmas, MSEs_KRR_RBF, yerr=errors_KRR_RBF, linestyle="", marker=0, capsize=2, markersize="10", label="λ = 1")
+    # axes[1].errorbar(sigmas, MSEs_SVR_RBF, yerr=errors_SVR_RBF, linestyle="", marker=0, capsize=2, markersize="10", label="λ = 1")
 
 
-    axes[0].set_xscale("log")
-    # axes[0].set_xticks(range(len(MSEs_KRR_RBF)), [0.001, 0.01, 0.1, 1, 2, 3, 4, 6, 10, 100])
-    axes[0].xaxis.set_major_locator(LogLocator(base=10))
-    axes[0].xaxis.set_major_formatter(LogFormatter(base=10, labelOnlyBase=True))
+    # axes[0].set_xscale("log")
+    # # axes[0].set_xticks(range(len(MSEs_KRR_RBF)), [0.001, 0.01, 0.1, 1, 2, 3, 4, 6, 10, 100])
+    # axes[0].xaxis.set_major_locator(LogLocator(base=10))
+    # axes[0].xaxis.set_major_formatter(LogFormatter(base=10, labelOnlyBase=True))
 
-    axes[0].errorbar(sigmas, MSEs_KRR_RBF_opt_lambda, color="red", yerr=errors_KRR_RBF_opt_lambda, linestyle="", marker=1, capsize=2, markersize="10", label="Optimal λ")
-    axes[1].errorbar(sigmas, MSEs_SVR_RBF_opt_lambda, color="red", yerr=errors_SVR_RBF_opt_lambda, linestyle="", marker=1, capsize=2, markersize="10", label="Optimal λ")
+    # axes[0].errorbar(sigmas, MSEs_KRR_RBF_opt_lambda, color="red", yerr=errors_KRR_RBF_opt_lambda, linestyle="", marker=1, capsize=2, markersize="10", label="Optimal λ")
+    # axes[1].errorbar(sigmas, MSEs_SVR_RBF_opt_lambda, color="red", yerr=errors_SVR_RBF_opt_lambda, linestyle="", marker=1, capsize=2, markersize="10", label="Optimal λ")
     
-    for idx, sigma in enumerate(sigmas):
-        axes[1].annotate(
-        f"{support_vectors_SVR_RBF[idx]:.0f}",
-        xy=(sigma, MSEs_SVR_RBF[idx] + 5),
-        xytext=(0, 10),  # offset in points
-        textcoords='offset points',
-        ha='center',
-        color='blue',
-        fontsize=8
-    )
+    # for idx, sigma in enumerate(sigmas):
+    #     axes[1].annotate(
+    #     f"{support_vectors_SVR_RBF[idx]:.0f}",
+    #     xy=(sigma, MSEs_SVR_RBF[idx] + 5),
+    #     xytext=(0, 10),  # offset in points
+    #     textcoords='offset points',
+    #     ha='center',
+    #     color='blue',
+    #     fontsize=8
+    # )
 
-    for idx, sigma in enumerate(sigmas):
-        axes[1].annotate(
-        f"{support_vectors_SVR_RBF_opt_lambda[idx]:.0f}",
-        xy=(sigma, MSEs_SVR_RBF_opt_lambda[idx] - 5),
-        xytext=(0, -12),
-        textcoords='offset points',
-        ha='center',
-        color='red',
-        fontsize=8
-    )
+    # for idx, sigma in enumerate(sigmas):
+    #     axes[1].annotate(
+    #     f"{support_vectors_SVR_RBF_opt_lambda[idx]:.0f}",
+    #     xy=(sigma, MSEs_SVR_RBF_opt_lambda[idx] - 5),
+    #     xytext=(0, -12),
+    #     textcoords='offset points',
+    #     ha='center',
+    #     color='red',
+    #     fontsize=8
+    # )
 
 
 
-    axes[0].grid(True)
-    axes[1].grid(True)
+    # axes[0].grid(True)
+    # axes[1].grid(True)
 
-    axes[0].legend()
-    axes[1].legend()
-    axes[0].set_title("Kernel Ridge Regression")
-    axes[1].set_title("Support Vector Regression, ε = 5")
-    axes[0].set_xlabel("σ")
-    axes[1].set_xlabel("σ")
-    plt.savefig("rbf_comparison.pdf", bbox_inches="tight")
-    plt.show()
+    # axes[0].legend()
+    # axes[1].legend()
+    # axes[0].set_title("Kernel Ridge Regression")
+    # axes[1].set_title("Support Vector Regression, ε = 5")
+    # axes[0].set_xlabel("σ")
+    # axes[1].set_xlabel("σ")
+    # plt.savefig("rbf_comparison.pdf", bbox_inches="tight")
+    # plt.show()
+    #
+    ##########################################################################################################################
+    #LAMBDAS
+    ##########################################################################################################################
+    # np.set_printoptions(suppress=True)
+    # print("KRR_RBF:")
+    # lambdas_KRR_RBF_opt_lambda = np.load("data/lambdas_KRR_RBF_opt_lambda.npy")
+    # print(np.mean(lambdas_KRR_RBF_opt_lambda, axis=1))
+    # print("--------------------------------------------------------")
+    # print("KRR_polynomia;:")
+    # lambdas_KRR_polynomial_opt_lambda = np.load("data/lambdas_KRR_polynomial_opt_lambda.npy")
+    # print(np.mean(lambdas_KRR_polynomial_opt_lambda, axis=1))
+    # print("--------------------------------------------------------")
+    # print("SVR_RBF:")
+    # lambdas_SVR_RBF_opt_lambda = np.load("data/lambdas_SVR_RBF_opt_lambda.npy")
+    # print(np.mean(lambdas_SVR_RBF_opt_lambda, axis=1))
+    # print("--------------------------------------------------------")
+    # print("SVR_polynomial:")
+    # lambdas_SVR_polynomial_opt_lambda = np.load("data/lambdas_SVR_polynomial_opt_lambda.npy")
+    # print(np.mean(lambdas_SVR_polynomial_opt_lambda, axis=1))
+    # print("--------------------------------------------------------")
+
+
+    ##########################################################################################################################
+    #PART 3
+    ##########################################################################################################################
+
+    import os
+    import cv2
+
+    def flatten_images(images):
+        return np.array([img.flatten() for img in images])
+
+    images = []
+    ages = []
+    for filename in os.listdir("./images"):
+        img = cv2.imread(f"images/{filename}", cv2.IMREAD_GRAYSCALE)
+        age = filename[4:6]
+        resized_img = cv2.resize(img, (128, 128))
+
+        images.append(resized_img)
+        ages.append(int(age))
+
+    X_train, X_test, y_train, y_test = train_test_split(images, ages, test_size=0.2, random_state=42)
+
+    # my_regressor = KernelizedRidgeRegression(HOG(0.001))
+    # my_regressor.fit(X_train, y_train)
+    # preds = my_regressor.predict(X_test)
+    # print(np.mean((preds - y_test)**2))
+
+    # X_train_flat = flatten_images(X_train)
+    # X_test_flat = flatten_images(X_test)
+
+    # bad_regressor = KernelizedRidgeRegression(Polynomial(2))
+    # bad_regressor.fit(X_train_flat, y_train)
     
+    # bad_preds = bad_regressor.predict(X_test_flat)
+    # print(np.mean((bad_preds - y_test)**2))
 
 
-    ##############################################################################
-    #KFOLD USING WRAPPER
-    ##############################################################################
-    # s = []
-    # standard_errors = []
-    # mean_support_vectors = []
-    # for i in range(1, 11):
+    scores = cross_val_predict(KRR_scikit(HOG(0.001)), images, ages, cv=KFold(n_splits=10, shuffle=True, random_state=42), n_jobs=-1)
+    print(np.mean((scores - ages)**2))
+    print(np.std(scores)/np.sqrt(len(images)))
 
-    #     support_vector_numbers = []
-    #     m = Pipeline([
-    #         ("scaler", StandardScaler()),
-    #         ("Kernel Ridge Regression", SVR_scikit(kernel=Polynomial(M=i), lambda_=1))
-    #     ])
-
-    #     predictions = cross_val_predict(m, X, y, cv=KFold(n_splits=2, shuffle=True, random_state=42))
-        
-    #     errors = np.square(predictions - y)
-    #     s.append(np.mean(errors))
-    #     mean_support_vectors.append(np.mean(support_vector_numbers))
-    #     standard_errors.append(np.std(errors)/np.sqrt(len(errors)))
-    
-    # plt.errorbar(range(len(s)), s, yerr=standard_errors, linestyle="", marker="o", markersize="3")
-    # plt.yscale("log")
-
-    ###############################################################################
-    #KFOLD WITHOUT WRAPPER
-    ###############################################################################
-
-
-    # m = Pipeline([
-    #         ("scaler", StandardScaler()),
-    #         ("Kernel Ridge Regression", KRR_scikit(kernel=Polynomial(M=1), lambda_=1))
-    #     ])
-
-    # param_grid = {"Kernel Ridge Regression__lambda_": [0.1, 0.5]}
-
-    # inner_cv = GridSearchCV(m, param_grid, scoring="neg_mean_squared_error", cv=5)
-    
-    # outer_scores = cross_val_score(inner_cv, X, y, scoring="neg_mean_squared_error", cv=10)
-
-    # print("Mean outer CV score:", -outer_scores.mean())
-
-
-
-
-
+    scores = cross_val_predict(KRR_scikit(Polynomial(2)), flatten_images(images), ages, cv=KFold(n_splits=10, shuffle=True, random_state=42), n_jobs=-1)
+    print(np.mean((scores - ages)**2))
+    print(np.std(scores)/np.sqrt(len(images)))
